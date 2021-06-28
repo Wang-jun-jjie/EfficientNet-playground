@@ -27,11 +27,11 @@ parser.add_argument('--resume', '-r',       action='store_true',              he
 parser.add_argument('--sess',               default='default',    type=str,   help='session id')
 parser.add_argument('--seed',               default=70082353,     type=int,   help='random seed')
 parser.add_argument('--batch_size', '-b',   default=120,          type=int,   help='mini-batch size (default: 120)')
-parser.add_argument('--epochs', '-e',       default=2 ,           type=int,   help='number of total epochs to run')
+parser.add_argument('--epochs', '-e',       default=20 ,           type=int,   help='number of total epochs to run')
 parser.add_argument('--image-size', '--is', default=256,          type=int,   help='resize input image (default: 256 for ImageNet)')
 parser.add_argument('--image-crop', '--ic', default=224,          type=int,   help='centercrop input image after resize (default: 224 for ImageNet)')
-parser.add_argument('--data-directory',     default='../ImageNet',type=str,   help='dataset inputs root directory')
-parser.add_argument('--data-classname',     default='../ImageNet/LOC_synset_mapping.txt',type=str, help='dataset classname file')
+parser.add_argument('--data-directory',     default='../food-11',type=str,   help='dataset inputs root directory')
+# parser.add_argument('--data-classname',     default='../ImageNet/LOC_synset_mapping.txt',type=str, help='dataset classname file')
 parser.add_argument('--opt-level', '-o',    default='O1',         type=str,   help='Nvidia apex optimation level (default: O1)')
 parser.add_argument('--model-name', '-m',   default='efficientnet-b1', type=str, help='Specify the varient of the model ')
 args = parser.parse_args()
@@ -45,19 +45,19 @@ def main():
     train_loader, test_loader = get_loaders(args.data_directory, args.batch_size, \
                                             args.image_size, args.image_crop)
     # load the class label (Imagenet)
-    classPath = args.data_classname
-    classes = list()
-    with open(classPath) as class_file:
-        for line in class_file:
-            class_name = line[10:].strip().split(',')[0]
-            classes.append(class_name)
-    classes = tuple(classes)
+    # classPath = args.data_classname
+    # classes = list()
+    # with open(classPath) as class_file:
+    #     for line in class_file:
+    #         class_name = line[10:].strip().split(',')[0]
+    #         classes.append(class_name)
+    # classes = tuple(classes)
 
     # Load model
     if args.resume:
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
-        model = EfficientNet.from_name(args.model_name, num_classes=1000).to(device)
+        model = EfficientNet.from_name(args.model_name, num_classes=11).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
 
@@ -72,7 +72,7 @@ def main():
         print('==> Building model..')
         epoch_start = 0
         prev_acc = 0.0
-        model = EfficientNet.from_name(args.model_name, num_classes=1000).to(device)
+        model = EfficientNet.from_name(args.model_name, num_classes=11).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
 

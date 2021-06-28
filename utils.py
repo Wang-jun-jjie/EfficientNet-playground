@@ -10,7 +10,7 @@ imagenet_mean = (0.485, 0.456, 0.406)
 imagenet_std = (0.229, 0.224, 0.225)
 
 def get_loaders(data_directory, batch_size, image_size, image_crop):
-    print('==> Preparing ImageNet dataset..')
+    print('==> Preparing food-11 dataset..')
     train_transform = transforms.Compose([
         transforms.Resize((image_size,image_size)),
         transforms.RandomResizedCrop(image_crop),
@@ -24,11 +24,11 @@ def get_loaders(data_directory, batch_size, image_size, image_crop):
         transforms.ToTensor(),
         transforms.Normalize(imagenet_mean, imagenet_std),
     ])
-    train_dataset = datasets.ImageFolder(root=data_directory+'/train', \
+    train_dataset = datasets.ImageFolder(root=data_directory+'/training/labeled', \
         transform=train_transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,\
         shuffle=True, drop_last=True, num_workers=8, pin_memory=True)
-    test_dataset = datasets.ImageFolder(root=data_directory+'/val', \
+    test_dataset = datasets.ImageFolder(root=data_directory+'/validation', \
         transform=test_transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,\
         shuffle=True, drop_last=True, num_workers=8, pin_memory=True)
