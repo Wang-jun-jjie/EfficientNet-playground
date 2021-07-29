@@ -20,20 +20,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 # pre-define model: https://github.com/lukemelas/EfficientNet-PyTorch
 from efficientnet.model import EfficientNet
-from utils import *
+from utils.utils import get_loaders, normalize, inv_normalize
 
 parser = argparse.ArgumentParser( description='PyTorch efficientnet model playground')
 parser.add_argument('--resume', '-r',       action='store_true',              help='resume from checkpoint')
-parser.add_argument('--sess',               default='default',    type=str,   help='session id')
-parser.add_argument('--seed',               default=70082353,     type=int,   help='random seed')
-parser.add_argument('--batch_size', '-b',   default=120,          type=int,   help='mini-batch size (default: 120)')
+parser.add_argument('--prefix',             default='default',     type=str,   help='prefix for model checkpoints')
+parser.add_argument('--seed',               default=33201701,      type=int,   help='random seed')
+
+parser.add_argument('--batch_size', '-b',   default=120,           type=int,   help='mini-batch size (default: 120)')
 parser.add_argument('--epochs', '-e',       default=20 ,           type=int,   help='number of total epochs to run')
-parser.add_argument('--image-size', '--is', default=256,          type=int,   help='resize input image (default: 256 for ImageNet)')
-parser.add_argument('--image-crop', '--ic', default=224,          type=int,   help='centercrop input image after resize (default: 224 for ImageNet)')
-parser.add_argument('--data-directory',     default='../food-11',type=str,   help='dataset inputs root directory')
-# parser.add_argument('--data-classname',     default='../ImageNet/LOC_synset_mapping.txt',type=str, help='dataset classname file')
-parser.add_argument('--opt-level', '-o',    default='O1',         type=str,   help='Nvidia apex optimation level (default: O1)')
-parser.add_argument('--model-name', '-m',   default='efficientnet-b1', type=str, help='Specify the varient of the model ')
+parser.add_argument('--lr',                 default=0.001,         type=float, help='learning rate for optimizer')
+parser.add_argument('--image-size', '--is', default=224,           type=int,   help='resize input image (default: 224 for ImageNet)')
+parser.add_argument('--data-directory',     default='../Restricted_ImageNet',type=str,   help='dataset inputs root directory')
+
+parser.add_argument('--opt-level', '-o',    default='O1',          type=str,   help='Nvidia apex optimation level (default: O1)')
+parser.add_argument('--model-name', '-m',   default='efficientnet-b0', type=str, help='Specify the varient of the model ')
 args = parser.parse_args()
 
 def main():
@@ -43,25 +44,19 @@ def main():
     torch.cuda.manual_seed(args.seed)
     # load dataset (Imagenet)
     train_loader, test_loader = get_loaders(args.data_directory, args.batch_size, \
-                                            args.image_size, args.image_crop)
-    # load the class label (Imagenet)
-    # classPath = args.data_classname
-    # classes = list()
-    # with open(classPath) as class_file:
-    #     for line in class_file:
-    #         class_name = line[10:].strip().split(',')[0]
-    #         classes.append(class_name)
-    # classes = tuple(classes)
-
-    # Load model
+                                            args.image_size, augment=True)
+    # Load model and optimizer
+    model = EfficientNet.from_name(args.model_name, num_classes=10).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
+                            # momentum=args.momentum,
+                            # weight_decay=args.weight_decay
+                            )
     if args.resume:
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
-        model = EfficientNet.from_name(args.model_name, num_classes=11).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-        model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
+        model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level, verbosity=0)
 
-        checkpoint = torch.load('./checkpoint/' + args.sess + '_' + str(args.seed) + '.pth')
+        checkpoint = torch.load('./checkpoint/' + args.prefix + '.pth')
         prev_acc = checkpoint['acc']
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -72,17 +67,15 @@ def main():
         print('==> Building model..')
         epoch_start = 0
         prev_acc = 0.0
-        model = EfficientNet.from_name(args.model_name, num_classes=11).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-        model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level)
+        model, optimizer = amp.initialize(model, optimizer, opt_level=args.opt_level, verbosity=0)
+    criterion = nn.CrossEntropyLoss().to(device)
 
     # Logger
-    result_folder = './results/'
+    result_folder = './logs/'
     if not os.path.exists(result_folder):
         os.makedirs(result_folder)
     logger = logging.getLogger(__name__)
-    logname = args.model_name + '_' + args.sess + \
-        '_' + args.opt_level + '_' + str(args.seed) + '.log'
+    logname = args.prefix + '_' + args.opt_level + '.log'
     logfile = os.path.join(result_folder, logname)
     if os.path.exists(logfile):
         os.remove(logfile)
@@ -103,8 +96,8 @@ def main():
             data, target = data.to(device), target.to(device)
 
             optimizer.zero_grad()
-            output_logit = model(data)
-            loss = F.cross_entropy(output_logit, target)
+            output_logit = model(normalize(data))
+            loss = criterion(output_logit, target)
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
             # loss.backward()
@@ -128,9 +121,8 @@ def main():
             for batch_idx, (data, target) in enumerate(test_loader):
                 data, target = data.to(device), target.to(device)
     
-                optimizer.zero_grad()
-                output_logit = model(data)
-                loss = F.cross_entropy(output_logit, target)
+                output_logit = model(normalize(data))
+                loss = criterion(output_logit, target)
                 preds = F.softmax(output_logit, dim=1)
                 preds_top_p, preds_top_class = preds.topk(1, dim=1)
     
@@ -147,7 +139,7 @@ def main():
         print('==> Saving..')
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        save_path = './checkpoint/' + args.sess + '_' + str(args.seed) + '.pth'
+        save_path = './checkpoint/' + args.prefix + '.pth'
         torch.save({
             'epoch': epoch,
             'acc': acc,
@@ -158,27 +150,22 @@ def main():
             }, save_path)
     
     # Run
-    logger.info('Epoch \t Seconds \t \t Train Loss \t Train Acc')
+    logger.info('Epoch  Seconds    Train Loss  Train Acc    Test Loss  Test Acc')
     start_train_time = time.time()
     for epoch in range(epoch_start, args.epochs):
         start_epoch_time = time.time()
         
         train_loss, train_acc = train(epoch)
+        test_loss, test_acc = test(epoch)
         epoch_time = time.time()
-        logger.info('%5d \t %7.1f \t \t %10.4f \t %9.4f',
-            epoch, epoch_time - start_epoch_time, train_loss, train_acc)
+        logger.info('%5d  %7.1f    %10.4f  %9.4f    %9.4f  %8.4f',
+            epoch, epoch_time - start_epoch_time, train_loss, train_acc, test_loss, test_acc)
         # Save checkpoint.
         if train_acc - prev_acc  > 0.1:
             prev_acc = train_acc
             checkpoint(train_acc, epoch)
     train_time = time.time()
     logger.info('Total train time: %.4f minutes', (train_time - start_train_time)/60)
-
-    # Evaluation
-    logger.info('Test Loss \t Test Acc')
-    test_loss, test_acc = test(epoch)
-    logger.info('%9.4f \t %8.4f', test_loss, test_acc)
-
 
 
 if __name__ == "__main__":

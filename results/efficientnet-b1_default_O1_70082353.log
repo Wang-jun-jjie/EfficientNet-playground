@@ -1,7 +1,0 @@
-[2021/06/12 21:41:37] - Namespace(resume=False, sess='default', seed=70082353, batch_size=120, epochs=2, image_size=256, image_crop=224, data_directory='../ImageNet', data_classname='../ImageNet/LOC_synset_mapping.txt', opt_level='O1', model_name='efficientnet-b1')
-[2021/06/12 21:41:37] - Epoch 	 Seconds 	 	 Train Loss 	 Train Acc
-[2021/06/12 22:31:06] -     0 	  2969.1 	 	   601.4744 	   10.0585
-[2021/06/12 23:20:36] -     1 	  2969.2 	 	   430.3886 	   27.0680
-[2021/06/12 23:20:36] - Total train time: 98.9770 minutes
-[2021/06/12 23:20:36] - Test Loss 	 Test Acc
-[2021/06/12 23:21:19] -  354.4360 	  35.9575
