@@ -34,7 +34,7 @@ parser.add_argument('--image-size', '--is', default=224,           type=int,   h
 parser.add_argument('--data-directory',     default='../Restricted_ImageNet',type=str,   help='dataset inputs root directory')
 
 parser.add_argument('--opt-level', '-o',    default='O1',          type=str,   help='Nvidia apex optimation level (default: O1)')
-parser.add_argument('--model-name', '-m',   default='efficientnet-b0', type=str, help='Specify the varient of the model ')
+parser.add_argument('--model-name', '-m',   default='resnet18', type=str, help='Specify the varient of the model ')
 args = parser.parse_args()
 
 def main():
@@ -46,7 +46,16 @@ def main():
     train_loader, test_loader = get_loaders(args.data_directory, args.batch_size, \
                                             args.image_size, augment=True)
     # Load model and optimizer
-    model = EfficientNet.from_name(args.model_name, num_classes=10).to(device)
+    if args.model_name == 'resnet18':
+        model = models.resnet18(pretrained=False, num_classes=10).to(device)
+    elif args.model_name == 'resnet34':
+        model = models.resnet34(pretrained=False, num_classes=10).to(device)
+    elif args.model_name == 'resnet50':
+        model = models.resnet50(pretrained=False, num_classes=10).to(device)
+    else:
+        print('The model is not supported')
+        return
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
                             # momentum=args.momentum,
                             # weight_decay=args.weight_decay
